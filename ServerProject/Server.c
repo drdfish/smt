@@ -10,6 +10,8 @@ sensor_data_t* client_sensor_data[MAX_CLIENTS];
 int data_counters[MAX_CLIENTS] ;
 char* client_ids[MAX_CLIENTS];
 
+my_socket tcp_sock, udp_sock;
+
 void init_client_sockets() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         client_sockets[i] = -1; // -1 表示该位置没有连接
@@ -84,6 +86,7 @@ int handle_tcp_connection(my_socket client_sock) {
     memcpy(&device_data, buffer, sizeof(device_data_t));
     char* client_id = device_data.device_id;
 
+    server_message_t server_msg;
     // 检查数据类型，只处理 type == 2，即控制命令
     if (device_data.type == 2) {
         control_cmd_t cmd = device_data.data.control_cmd;
@@ -95,8 +98,11 @@ int handle_tcp_connection(my_socket client_sock) {
 
                     // 模拟传感器数据
                     sensor_data_t sensor_data = { 1, 25.5, "2025-10-24 10:00:00" };
+                    server_msg.type = MSG_TYPE_SENSOR_DATA_RESPONSE;
+                    server_msg.data.sensor_data = sensor_data;
 
-                    send_data(client_sock, &sensor_data, sizeof(sensor_data), 0);
+                    // 发送数据
+                    send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
                     printf("传感器数据已发送\n");
                     break;
                 }
@@ -105,16 +111,22 @@ int handle_tcp_connection(my_socket client_sock) {
                 {
                     printf("执行控制命令: %s\n", cmd.param);
 
-                    char response[] = "控制命令执行成功";
-                    send_data(client_sock, response, strlen(response), 0);
+                    server_msg.type = MSG_TYPE_COMMAND_RESULT;
+                    snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result), "控制命令执行成功");
+
+                    // 发送数据
+                    send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
                     break;
                 }
                 case 0: // 关闭连接
                 {
                     printf("执行关闭: %s\n", cmd.param);
 
-                    char response[] = "连接断开";
-                    send_data(client_sock, response, strlen(response), 0);
+                    server_msg.type = MSG_TYPE_COMMAND_RESULT;
+                    snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result), "连接断开");
+
+                    // 发送数据
+                    send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
                     return -1; // 关闭连接，返回 -1
                     break;
                 }
@@ -124,11 +136,17 @@ int handle_tcp_connection(my_socket client_sock) {
                     int index = getSocketIndex(client_sock);
                     if (index >= 0) {
                         client_ids[index] = client_id;
-                        char response[] = "登录成功";
-                        send_data(client_sock, response, strlen(response), 0);
+                        server_msg.type = MSG_TYPE_COMMAND_RESULT;
+                        snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result), "登录成功");
+
+                        // 发送数据
+                        send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
                     }else {
-                        char response[] = "登录失败";
-                        send_data(client_sock, response, strlen(response), 0);
+                        server_msg.type = MSG_TYPE_COMMAND_RESULT;
+                        snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result), "登录失败");
+
+                        // 发送数据
+                        send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
                         return -1;
                     }
                     break;
@@ -172,17 +190,18 @@ int handle_udp_data(my_socket udp_sock) {
         printf("收到传感器数据 - 类型: %d, 数值: %.2f, 时间: %s\n",
                sensor_data.type, sensor_data.value, sensor_data.timestamp);
 
-        // 数据存储逻辑
-        FILE* log_file = fopen("sensor_log.txt", "a");
-        if (log_file) {
-            fprintf(log_file, "类型: %d, 数值: %.2f, 时间: %s\n",
-                    sensor_data.type, sensor_data.value, sensor_data.timestamp);
-            fclose(log_file);
-        }
-
         // 报警检查
         if (sensor_data.type == 1 && sensor_data.value > 30.0) {
             printf("警告: 温度过高! 当前温度: %.2f\n", sensor_data.value);
+            alarm_data_t alarm_data;
+            snprintf(alarm_data.device_id, sizeof(alarm_data.device_id),  client_id);
+            snprintf(alarm_data.alarm_info, sizeof(alarm_data.alarm_info), "温度过高! 当前温度: %.2f", sensor_data.value);
+            snprintf(alarm_data.timestamp, sizeof(alarm_data.timestamp), "%s", sensor_data.timestamp);
+            server_message_t message ;
+            message.type = MSG_TYPE_ALARM;
+            message.data.alarm_data = alarm_data;
+
+            send_data(client_sockets[index], &message, sizeof(message), 0);
         }
         return 1;
     }else {
@@ -191,7 +210,6 @@ int handle_udp_data(my_socket udp_sock) {
 }
 
 int main(int argc, char* argv[]) {
-    my_socket tcp_sock, udp_sock;
     struct sockaddr_in tcp_addr, udp_addr;
     fd_set read_fds;
     int max_fd;

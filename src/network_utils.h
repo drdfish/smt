@@ -53,6 +53,34 @@ typedef struct {
 
 } device_data_t;
 
+typedef enum {
+    MSG_TYPE_UNKNOWN,
+    MSG_TYPE_SENSOR_DATA_RESPONSE, // 对获取传感器数据请求的响应
+    MSG_TYPE_COMMAND_RESULT,       // 对执行远程命令的响应
+    MSG_TYPE_DEVICE_LIST_RESPONSE, // 对列出设备请求的响应
+    MSG_TYPE_CONFIG_RESPONSE,      // 对配置设备请求的响应
+    MSG_TYPE_ALARM                 // 服务器主动发送的告警
+} server_message_type_t;
+
+// 服务器告警结构体
+typedef struct {
+    char device_id[32];
+    char alarm_info[256];
+    char timestamp[20];
+} alarm_data_t;
+
+// 通用服务器消息结构体
+typedef struct {
+    server_message_type_t type;
+    union {
+        sensor_data_t sensor_data;
+        char command_result[BUFFER_SIZE];
+        char device_list[BUFFER_SIZE];
+        char config_response[128];
+        alarm_data_t alarm_data;
+    } data;
+} server_message_t;
+
 void init_console();
 
 void get_current_time(char* buffer);
