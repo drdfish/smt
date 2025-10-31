@@ -38,19 +38,25 @@ void network_cleanup() {
     WSACleanup();
 }
 
-my_socket create_tcp_socket() {
+my_socket create_tcp_socket(int* success) {
     SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+    *success = 1;
     if (sock == INVALID_SOCKET) {
         printf("socket failed: %d\n", WSAGetLastError());
+        *success = -1;
     }
+
     return sock;
 }
 
-my_socket create_udp_socket() {
+my_socket create_udp_socket(int* success) {
     SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
+    *success = 1;
     if (sock == INVALID_SOCKET) {
         printf("socket failed: %d\n", WSAGetLastError());
+        *success = -1;
     }
+
     return sock;
 }
 
@@ -89,18 +95,23 @@ int network_init() {
 void network_cleanup() {
 }
 
-my_socket create_tcp_socket() {
+my_socket create_tcp_socket(int* success) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
+    success = 1;
     if (sock < 0) {
         perror("socket failed");
+        success = -1;
     }
+
     return sock;
 }
 
-my_socket create_udp_socket() {
+my_socket create_udp_socket(int* success) {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    success = 1;
     if (sock < 0) {
         perror("socket failed");
+        success = -1;
     }
     return sock;
 }

@@ -14,7 +14,12 @@ void tcp_control_client() {
     printf("启动TCP控制客户端...\n");
 
     // 1. 创建套接字
-    sock = create_tcp_socket();
+    int success = 0;
+    sock = create_tcp_socket(&success);
+    if (success < 0) {
+        perror("TCP Error");
+        exit(1);
+    }
 
     // 2. 配置服务器地址
     memset(&server_addr, 0, sizeof(server_addr));
@@ -156,7 +161,14 @@ void udp_sensor_client() {
 
     printf("启动UDP传感器客户端...\n");
 
-    sock = create_udp_socket();
+    int success = 0;
+    sock = create_udp_socket(&success);
+
+    if (success < 0) {
+        perror("TCP Error");
+        exit(1);
+    }
+
     srand((unsigned int)time(NULL)); // 初始化随机数种子
 
     // 配置服务器地址

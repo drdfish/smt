@@ -80,25 +80,41 @@ int handle_udp_data(my_socket udp_sock) {
     return 0;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     my_socket tcp_sock, udp_sock;
     struct sockaddr_in tcp_addr, udp_addr;
     fd_set read_fds;
     int max_fd;
+
+    int tcp_port = TCP_PORT;
+    int udp_port = UDP_PORT;
+
+    // 设置 tcp udp 端口
+    if (argc > 1) {
+        tcp_port = atoi(argv[1]);
+    }
+    if (argc > 2) {
+        udp_port = atoi(argv[2]);
+    }
 
     init_console();
     printf("启动智能家具服务器...\n");
     if(network_init()<0)
         return -1;
     // 创建 TCP 和 UDP 套接字
-    tcp_sock = create_tcp_socket();
-    udp_sock = create_udp_socket();
+    int success =0;
+    tcp_sock = create_tcp_socket(&success);
+    if(success<0)
+        return -1;
+    udp_sock = create_udp_socket(&success);
+    if(success<0)
+        return -1;
 
     // 设置 TCP 地址
     memset(&tcp_addr, 0, sizeof(tcp_addr));
     tcp_addr.sin_family = AF_INET;
     tcp_addr.sin_addr.s_addr = INADDR_ANY;
-    tcp_addr.sin_port = htons(TCP_PORT);
+    tcp_addr.sin_port = htons(tcp_port);
 
     // 绑定 TCP 套接字
     bind_socket(tcp_sock, (struct sockaddr*)&tcp_addr, sizeof(tcp_addr));
@@ -110,7 +126,7 @@ int main() {
     memset(&udp_addr, 0, sizeof(udp_addr));
     udp_addr.sin_family = AF_INET;
     udp_addr.sin_addr.s_addr = INADDR_ANY;
-    udp_addr.sin_port = htons(UDP_PORT);
+    udp_addr.sin_port = htons(udp_port);
 
     // 绑定 UDP 套接字
     bind_socket(udp_sock, (struct sockaddr*)&udp_addr, sizeof(udp_addr));

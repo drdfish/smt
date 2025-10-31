@@ -1,6 +1,6 @@
 # Client 目录 CMakeLists
 set(CLIENT_SOURCES
-    Client.c
+        Client.c
 )
 
 add_executable(client ${CLIENT_SOURCES})
