@@ -10,8 +10,13 @@ void tcp_control_client() {
 
     printf("启动TCP控制客户端...\n");
 
-    sock = create_tcp_socket();
-
+    int success = 0;
+    sock = create_tcp_socket(&success);
+    if (success < 0) {
+        perror("创建TCP套接字失败");
+        exit(1);
+    }
+        
     // 连接服务器
     if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("TCP连接失败");
@@ -42,7 +47,13 @@ void udp_sensor_client() {
 
     printf("启动UDP传感器客户端...\n");
 
-    sock = create_udp_socket();
+    int success = 0;
+    sock = create_udp_socket(&success);
+    if (success < 0) {
+        perror("创建TCP套接字失败");
+        exit(1);
+    }
+    
 
     for (int i = 0; i < 5; i++) {
         sensor_data_t sensor_data;

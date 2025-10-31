@@ -52,8 +52,8 @@ int my_inet_pton(int af, const char* src, void* dst);
 // 套接字操作函数声明
 int network_init();
 void network_cleanup();
-my_socket create_tcp_socket();
-my_socket create_udp_socket();
+my_socket create_tcp_socket(int *success);
+my_socket create_udp_socket(int *success);
 int bind_socket(my_socket sockfd, const struct sockaddr* addr, int addrlen);
 int listen_socket(my_socket sockfd, int backlog);
 int accept_connection(my_socket sockfd, struct sockaddr* addr, int* addrlen);
