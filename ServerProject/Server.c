@@ -2,7 +2,7 @@
 
 #define TCP_PORT 8080
 #define UDP_PORT 8081
-#define MAX_CLIENTS 4
+#define MAX_CLIENTS 10
 #define MAX_SENSOR_DATA 10
 
 my_socket client_sockets[MAX_CLIENTS];
@@ -25,10 +25,16 @@ int find_empty_slot() {
 
 void remove_client(int index) {
     if (index >= 0 && index < MAX_CLIENTS) {
-        close(client_sockets[index]);
+        close_socket(client_sockets[index]);
         client_sockets[index] = -1;  // 清除套接字
         printf("客户端套接字 %d 连接已断开\n", index);
     }
+    //释放内存
+    if (client_sensor_data[index] != NULL) {
+        free(client_sensor_data[index]);
+        client_sensor_data[index] = NULL;
+    }
+
 }
 
 // 处理 TCP 连接
@@ -64,7 +70,15 @@ int handle_tcp_connection(my_socket client_sock) {
         send_data(client_sock, response, strlen(response), 0);
         break;
     }
+    case 0: //关闭连接
+    {
+        printf("执行关闭: %s\n", cmd.param);
 
+        char response[] = "连接断开";
+
+        send_data(client_sock, response, strlen(response), 0);
+        return -1;
+    }
     default:
     {
         printf("未知命令\n");
@@ -167,7 +181,7 @@ int main(int argc, char* argv[]) {
     printf("TCP服务端口: %d\n", TCP_PORT);
     printf("UDP服务端口: %d\n", UDP_PORT);
 
-    max_fd = (tcp_sock > udp_sock) ? tcp_sock : udp_sock;
+
 
     while (1) {
         FD_ZERO(&read_fds);
@@ -177,6 +191,15 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (client_sockets[i] != -1) {
                 FD_SET(client_sockets[i], &read_fds);
+            }
+        }
+        max_fd = (tcp_sock > udp_sock) ? tcp_sock : udp_sock;
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (client_sockets[i] != -1) {
+                FD_SET(client_sockets[i], &read_fds);
+                if (client_sockets[i] > max_fd) {
+                    max_fd = client_sockets[i];
+                }
             }
         }
 
@@ -202,14 +225,14 @@ int main(int argc, char* argv[]) {
             int empty_slot = find_empty_slot();
             if (empty_slot == -1) {
                 printf("客户端连接已满，拒绝连接\n");
-                close(client_sock); // 拒绝连接
+                close_socket(client_sock); // 拒绝连接
             }
             else {
                 client_sockets[empty_slot] = client_sock;
                 client_sensor_data[empty_slot] = (sensor_data_t*)malloc(sizeof(sensor_data_t) * MAX_SENSOR_DATA);  // 假设最多有 MAX_SENSOR_DATA 个传感器数据
                 if (client_sensor_data[empty_slot] == NULL) {
                     perror("内存分配失败");
-                    close(client_sock);
+                    close_socket(client_sock);
                     client_sockets[empty_slot] = -1;
                 }
                 else {
@@ -227,11 +250,9 @@ int main(int argc, char* argv[]) {
 
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (client_sockets[i] != -1 && FD_ISSET(client_sockets[i], &read_fds)) {
-                handle_tcp_connection(client_sockets[i]);
-            }
-            else if (client_sockets[i] != -1) {
-                // 如果客户端连接断开，移除它
-                remove_client(i);
+                if (handle_tcp_connection(client_sockets[i])<0) {
+                    remove_client(i);
+                }
             }
         }
     }

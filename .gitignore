@@ -1,6 +1,7 @@
 # 忽略 Visual Studio 的 .vs 目录
 .vs/
 .git/
+.idea/
 
 # 忽略构建目录
 build/
