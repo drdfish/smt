@@ -1,9 +1,11 @@
 # 忽略 Visual Studio 的 .vs 目录
 .vs/
+.git/
 
 # 忽略构建目录
 build/
 out/
+bin/
 
 # 忽略安装目录
 install/
