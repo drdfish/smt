@@ -47,6 +47,27 @@ int getIDIndex(char* device_id) {
     return -1;
 }
 
+char* get_client_id_list() {
+    static char result[BUFFER_SIZE];  // 结果字符串，确保可以存储拼接后的所有数据
+    memset(result, 0, sizeof(result));  // 清空 result 字符串
+
+    // 遍历 client_ids 数组，拼接非空的 client_id
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (client_ids[i] != NULL && strlen(client_ids[i]) > 0) {
+            // 拼接 client_id，并加上换行符
+            if (strlen(result) + strlen(client_ids[i]) + 2 < sizeof(result)) {
+                strcat(result, client_ids[i]);  // 添加 client_id
+                strcat(result, "\n");  // 添加换行符
+            } else {
+                printf("警告: 结果字符串空间不足，部分数据未拼接\n");
+                break;
+            }
+        }
+    }
+
+    return result;  // 返回拼接后的结果字符串
+}
+
 void remove_client(int index) {
     if (index >= 0 && index < MAX_CLIENTS) {
         close_socket(client_sockets[index]);
@@ -91,33 +112,10 @@ int handle_tcp_connection(my_socket client_sock) {
     if (device_data.type == 2) {
         control_cmd_t cmd = device_data.data.control_cmd;
         if (client_id != NULL) {
+            int index = getSocketIndex(client_sock);
+            if (index >= 0)
+                client_ids[index] = client_id;
             switch (cmd.cmd) {
-                case 1: // 获取传感器数据
-                {
-                    printf("客户端请求传感器数据\n");
-
-                    // 模拟传感器数据
-                    sensor_data_t sensor_data = { 1, 25.5, "2025-10-24 10:00:00" };
-                    server_msg.type = MSG_TYPE_SENSOR_DATA_RESPONSE;
-                    server_msg.data.sensor_data = sensor_data;
-
-                    // 发送数据
-                    send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
-                    printf("传感器数据已发送\n");
-                    break;
-                }
-
-                case 2: // 控制设备
-                {
-                    printf("执行控制命令: %s\n", cmd.param);
-
-                    server_msg.type = MSG_TYPE_COMMAND_RESULT;
-                    snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result), "控制命令执行成功");
-
-                    // 发送数据
-                    send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
-                    break;
-                }
                 case 0: // 关闭连接
                 {
                     printf("执行关闭: %s\n", cmd.param);
@@ -130,25 +128,40 @@ int handle_tcp_connection(my_socket client_sock) {
                     return -1; // 关闭连接，返回 -1
                     break;
                 }
+                case 1: // 获取传感器列表
+                {
+                    printf("客户端请求传感器数据\n");
+
+                    char* dev_list = get_client_id_list();
+                    server_msg.type = MSG_TYPE_DEVICE_LIST_RESPONSE;
+                    strncpy(server_msg.data.device_list, dev_list, sizeof(server_msg.data.device_list) - 1);
+                    server_msg.data.device_list[sizeof(server_msg.data.device_list) - 1] = '\0';
+
+                    // 发送数据
+                    send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
+                    printf("传感器数据已发送\n");
+                    break;
+                }
+
+                case 2: // 控制设备
+                {
+                    int dev_index = getIDIndex(cmd.param);
+
+                    server_msg.type = MSG_TYPE_SENSOR_DATA_RESPONSE;
+                    int count = data_counters[dev_index];
+                    if (count>0)
+                        server_msg.data.sensor_data = client_sensor_data[dev_index][count-1];
+
+                    // 发送数据
+                    send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
+                    break;
+                }
                 case 3:
                 {
-                    printf("执行登录: %s\n", cmd.param);
-                    int index = getSocketIndex(client_sock);
-                    if (index >= 0) {
-                        client_ids[index] = client_id;
-                        server_msg.type = MSG_TYPE_COMMAND_RESULT;
-                        snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result), "登录成功");
-
-                        // 发送数据
-                        send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
-                    }else {
-                        server_msg.type = MSG_TYPE_COMMAND_RESULT;
-                        snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result), "登录失败");
-
-                        // 发送数据
-                        send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
-                        return -1;
-                    }
+                    server_msg.type = MSG_TYPE_COMMAND_RESULT;
+                    snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result),
+                               "执行控制命令%s成功", cmd.param);
+                    send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
                     break;
                 }
                 default:
