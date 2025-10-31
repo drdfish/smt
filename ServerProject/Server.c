@@ -7,25 +7,22 @@
 #define MAX_SENSOR_DATA 10
 
 my_socket client_sockets[MAX_CLIENTS];
-char* client_ids[MAX_CLIENTS];
+char client_ids[MAX_CLIENTS][4];
 
 
 sensor_data_t* device_sensor_data[MAX_DEVICES];
-char* device_ids[MAX_DEVICES];
+char device_ids[MAX_DEVICES][4];
 int data_counters[MAX_DEVICES];
 
 my_socket tcp_sock, udp_sock;
 
-void init_vector() {
+void init() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        client_sockets[i] = -1; // -1 表示该位置没有连接
-        client_ids[i] = NULL;
+        client_sockets[i] = -1;
+        client_ids[i][0] = '\0';
     }
-
     for (int i = 0; i < MAX_DEVICES; i++) {
-        device_sensor_data[i] = NULL;
-        device_ids[i] = NULL;
-        data_counters[i] = 0;
+        device_ids[i][0] = '\0';
     }
 }
 
@@ -49,7 +46,7 @@ int getSocketIndex(my_socket client_socket) {
 
 int getSocketIndexByID(char* device_id) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (client_ids[i] == device_id) {
+        if ( strcmp(client_ids[i], device_id) == 0) {
             return i;
         }
     }
@@ -58,7 +55,7 @@ int getSocketIndexByID(char* device_id) {
 
 int getDeviceIndex(char* device_id) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (device_ids[i] == device_id) {
+        if (strcmp(device_ids[i], device_id) == 0) {
             return i;
         }
     }
@@ -70,7 +67,7 @@ char* get_device_id_list() {
     memset(result, 0, sizeof(result));  // 清空 result 字符串
 
     for (int i = 0; i < MAX_DEVICES; i++) {
-        if (device_ids[i] != NULL && strlen(device_ids[i]) > 0) {
+        if (device_ids[i][0] != '\0') {
             if (strlen(result) + strlen(device_ids[i]) + 2 < sizeof(result)) {
                 strcat(result, device_ids[i]);  // 添加 client_id
                 strcat(result, "\n");  // 添加换行符
@@ -87,7 +84,6 @@ void remove_client(int index) {
     if (index >= 0 && index < MAX_CLIENTS) {
         close_socket(client_sockets[index]);
         client_sockets[index] = -1;  // 清除套接字
-        client_ids[index] = NULL;
         data_counters[index] = 0;
         printf("客户端套接字 %d 连接已断开\n", index);
     }
@@ -96,7 +92,7 @@ void remove_client(int index) {
 // 查找空设备槽位
 int find_empty_device_slot() {
     for (int i = 0; i < MAX_DEVICES; i++) {
-        if (device_ids[i] == NULL) {
+        if (device_ids[i][0] == '\0') {
             return i;
         }
     }
@@ -123,7 +119,7 @@ void add_data(char* device_id,sensor_data_t sensor_data) {
         int empty_slot = find_empty_device_slot();
         if (empty_slot != -1) {
             // 如果设备未满，创建新设备并添加数据
-            device_ids[empty_slot] = device_id;
+            strcpy(device_ids[empty_slot], device_id);
             device_sensor_data[empty_slot] = (sensor_data_t*)malloc(MAX_CLIENTS * sizeof(sensor_data_t));
             if (device_sensor_data[empty_slot] != NULL) {
                 device_sensor_data[empty_slot][0] = sensor_data;
@@ -159,7 +155,7 @@ int handle_tcp_connection(my_socket client_sock) {
         if (client_id != NULL) {
             int index = getSocketIndex(client_sock);
             if (index >= 0)
-                client_ids[index] = client_id;
+                strcpy(client_ids[index], client_id);
             switch (cmd.cmd) {
                 case 0: // 关闭连接
                 {
@@ -280,8 +276,7 @@ int main(int argc, char* argv[]) {
     if (argc > 2) {
         udp_port = atoi(argv[2]);
     }
-    init_vector();
-
+    init();
     init_console();
     printf("启动智能家具服务器...\n");
     init_console();
@@ -323,8 +318,6 @@ int main(int argc, char* argv[]) {
     printf("TCP服务端口: %d\n", TCP_PORT);
     printf("UDP服务端口: %d\n", UDP_PORT);
 
-
-
     while (1) {
         FD_ZERO(&read_fds);
         FD_SET(tcp_sock, &read_fds);
@@ -345,12 +338,10 @@ int main(int argc, char* argv[]) {
             }
         }
         int activity = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
-
         if (activity < 0) {
             perror("select错误");
             continue;
         }
-
         // 处理 TCP 连接请求
         if (FD_ISSET(tcp_sock, &read_fds)) {
             struct sockaddr_in client_addr;
