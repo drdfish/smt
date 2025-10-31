@@ -31,6 +31,10 @@
 #define my_socket int
 #endif
 
+#define CMD_LIST_DEVICE 1
+#define CMD_LIST_DEVICE_DATA 2
+#define CMD_EXEC_DEVICE 3
+
 // 定义传感器数据和控制命令的结构体
 typedef struct {
     int type;           // 类型：1 - 温度，2 - 湿度，3 - 光照等
@@ -39,7 +43,7 @@ typedef struct {
 } sensor_data_t;
 
 typedef struct {
-    int cmd;           // 命令类型 0 - 断开，1 - 数据请求，2 - 控制命令，3 - 登录
+    int cmd;           // 命令类型 0 - 断开，1 - 请求传感器设备列表，2 - 请求指定设备的数据，3 - 在指定设备上执行命令
     char param[32];    // 参数
 } control_cmd_t;
 

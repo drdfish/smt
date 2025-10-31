@@ -92,12 +92,42 @@ void process_user_command(char* cmd_line, my_socket sock) {
                 return;
             }
             printf("正在查询设备 '%s' 的传感器数据...\n", arg2);
-            // TODO: 构建并发送获取传感器数据的命令到服务器
-            // 这里需要根据你的具体协议来构建 device_data_t
+            // 构建并发送获取传感器数据的命令到服务器
+            // 构建 device_data_t
+            control_cmd_t control_cmd;
+            control_cmd.cmd = CMD_LIST_DEVICE_DATA;
+            strncpy(control_cmd.param, arg2, sizeof(control_cmd.param));  // 最多复制 sizeof(dest) 个字符
+            control_cmd.param[sizeof(control_cmd.param) - 1] = '\0';     // 确保字符串以 '\0' 结尾
+
+            device_data_t device_data = {
+                .device_id = DEVICE_ID,  // 假设 DEVICE_ID 是字符串，如 "DEV1"
+                .type = 2,               // 2 表示 control_cmd
+                .data.control_cmd = control_cmd  // 初始化 control_cmd
+            };
+
+            if (send_data(sock, &device_data, sizeof(device_data), 0) < 0) {
+                perror("发送执行命令失败");
+            }
+
         } else {
             // 这是 'ls' 命令
             printf("正在请求设备列表...\n");
             // TODO: 构建并发送列出设备的命令到服务器
+
+            // 构建 device_data_t
+            control_cmd_t control_cmd;
+            control_cmd.cmd = CMD_LIST_DEVICE;
+
+            device_data_t device_data = {
+                .device_id = DEVICE_ID,  // 假设 DEVICE_ID 是字符串，如 "DEV1"
+                .type = 2,               // 2 表示 control_cmd
+                .data.control_cmd = control_cmd
+            };
+
+            if (send_data(sock, &device_data, sizeof(device_data), 0) < 0) {
+                perror("发送执行命令失败");
+            }
+
         }
     } else if (strcmp(command, "conf") == 0) {
         arg1 = strtok(NULL, " \n");
@@ -106,12 +136,33 @@ void process_user_command(char* cmd_line, my_socket sock) {
             return;
         }
         printf("准备配置设备 '%s' (此功能待实现)...\n", arg1);
-        // TODO: 实现配置逻辑，可能需要更多用户输入
     } else if (strcmp(command, "exec") == 0) {
-         // TODO: 实现远程执行命令逻辑
-        printf("远程执行命令功能待实现。\n");
-    }
-     else if (strcmp(command, "exit") == 0) {
+        arg1 = strtok(NULL, " \n");
+
+        if (arg1 == NULL) {
+            printf("[错误] 用法: exec <device_id>\n");
+            return;
+        }
+
+        // 实现远程执行命令逻辑
+        // 构建 device_data_t
+        control_cmd_t control_cmd;
+        control_cmd.cmd = CMD_EXEC_DEVICE;
+        strncpy(control_cmd.param, arg1, sizeof(control_cmd.param));  // 最多复制 sizeof(dest) 个字符
+        control_cmd.param[sizeof(control_cmd.param) - 1] = '\0';     // 确保字符串以 '\0' 结尾
+
+
+        device_data_t device_data = {
+            .device_id = DEVICE_ID,  // 假设 DEVICE_ID 是字符串，如 "DEV1"
+            .type = 2,               // 2 表示 control_cmd
+            .data.control_cmd = control_cmd  // 初始化 control_cmd
+        };
+
+        if (send_data(sock, &device_data, sizeof(device_data), 0) < 0) {
+            perror("发送执行命令失败");
+        }
+
+    } else if (strcmp(command, "exit") == 0) {
         printf("正在断开连接...\n");
         close_socket(sock);
         exit(0);
@@ -126,8 +177,8 @@ void* user_input_thread(void* arg) {
     char user_input_buffer[BUFFER_SIZE];
 
     while (1) {
-        printf(">> ");
         fflush(stdout);
+        printf(">> ");
 
         if (fgets(user_input_buffer, sizeof(user_input_buffer), stdin) != NULL) {
             process_user_command(user_input_buffer, sock);
@@ -249,9 +300,11 @@ void udp_sensor_client() {
 
         // 发送数据到服务器
         device_data_t device_data = {
-
+            .device_id = DEVICE_ID,  // 假设 DEVICE_ID 是字符串，如 "DEV1"
+            .type = 2,               // 2 表示 control_cmd
+            .data.sensor_data = sensor_data  // 初始化 control_cmd
         };
-        send_data_with_addr(sock, &sensor_data, sizeof(sensor_data), 0,
+        send_data_with_addr(sock, &device_data, sizeof(device_data), 0,
             &server_addr, sizeof(server_addr));
 
         printf("发送传感器数据: 类型=%d, 数值=%.2f, 时间=%s\n",
