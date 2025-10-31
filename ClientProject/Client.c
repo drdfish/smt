@@ -5,11 +5,148 @@
 #define TCP_PORT 8080
 #define UDP_PORT 8081
 
+#define DEVICE_ID "DEV0"
+
+
+// 新增：处理从服务器收到的消息
+int handle_server_message(my_socket sock) {
+    server_message_t response;
+    int bytes_received = recv_data(sock, &response, sizeof(response), 0);
+
+    if (bytes_received <= 0) {
+        if (bytes_received == 0) {
+            printf("\n[系统] 服务器已关闭连接。\n");
+        } else {
+            perror("[系统] 接收数据失败");
+        }
+        // 标记需要退出程序
+        return -1;
+    }
+
+    // 根据消息类型处理
+    switch (response.type) {
+        case MSG_TYPE_ALARM:
+            // 收到告警信息，需要特殊处理以避免打断用户输入
+            // \r 会将光标移到行首
+            printf("\r\n--- 收到服务器告警 ---\n");
+            printf("  设备ID: %s\n", response.data.alarm_data.device_id);
+            printf("  告警信息: %s\n", response.data.alarm_data.alarm_info);
+            printf("  时间戳: %s\n", response.data.alarm_data.timestamp);
+            printf("----------------------\n");
+            printf(">> "); // 重新打印提示符
+            fflush(stdout); // 确保提示符立即显示
+            break;
+
+        case MSG_TYPE_SENSOR_DATA_RESPONSE:
+            printf("\n--- 收到传感器数据 ---\n");
+            printf("  数据类型: %d\n", response.data.sensor_data.type);
+            printf("  数    值: %.2f\n", response.data.sensor_data.value);
+            printf("  时 间 戳: %s\n", response.data.sensor_data.timestamp);
+            printf("------------------------\n");
+            break;
+
+        case MSG_TYPE_COMMAND_RESULT:
+            printf("\n--- 服务器执行结果 ---\n%s\n--------------------------\n", response.data.command_result);
+            break;
+
+        case MSG_TYPE_DEVICE_LIST_RESPONSE:
+            printf("\n--- 设备列表 ---\n%s\n----------------\n", response.data.device_list);
+            break;
+
+        case MSG_TYPE_CONFIG_RESPONSE:
+            printf("\n--- 配置结果 ---\n%s\n----------------\n", response.data.config_response);
+            break;
+
+        default:
+            printf("\n[警告] 收到未知类型的服务器消息: %d\n", response.type);
+            break;
+    }
+    return 0;
+}
+
+// 新增：解析并处理用户输入的命令
+void process_user_command(char* cmd_line, my_socket sock) {
+    char *command;
+    char *arg1, *arg2;
+
+    // 使用strtok分割命令
+    command = strtok(cmd_line, " \n"); // 按空格或换行符分割
+    if (command == NULL) {
+        return; // 用户只输入了回车
+    }
+
+    if (strcmp(command, "help") == 0) {
+        printf("可用命令:\n");
+        printf("  ls                  : 列出所有在线设备\n");
+        printf("  ls -s <device_id>   : 查询指定设备的传感器数据\n");
+        printf("  conf <device_id>    : 配置指定设备参数\n");
+        printf("  exec <device_id>    : 在指定设备上执行远程命令\n");
+        printf("  exit                : 退出客户端\n");
+    } else if (strcmp(command, "ls") == 0) {
+        arg1 = strtok(NULL, " \n");
+        if (arg1 != NULL && strcmp(arg1, "-s") == 0) {
+            // 这是 'ls -s <device_id>' 命令
+            arg2 = strtok(NULL, " \n");
+            if (arg2 == NULL) {
+                printf("[错误] 用法: ls -s <device_id>\n");
+                return;
+            }
+            printf("正在查询设备 '%s' 的传感器数据...\n", arg2);
+            // TODO: 构建并发送获取传感器数据的命令到服务器
+            // 这里需要根据你的具体协议来构建 device_data_t
+        } else {
+            // 这是 'ls' 命令
+            printf("正在请求设备列表...\n");
+            // TODO: 构建并发送列出设备的命令到服务器
+        }
+    } else if (strcmp(command, "conf") == 0) {
+        arg1 = strtok(NULL, " \n");
+        if (arg1 == NULL) {
+            printf("[错误] 用法: conf <device_id>\n");
+            return;
+        }
+        printf("准备配置设备 '%s' (此功能待实现)...\n", arg1);
+        // TODO: 实现配置逻辑，可能需要更多用户输入
+    } else if (strcmp(command, "exec") == 0) {
+         // TODO: 实现远程执行命令逻辑
+        printf("远程执行命令功能待实现。\n");
+    }
+     else if (strcmp(command, "exit") == 0) {
+        printf("正在断开连接...\n");
+        close_socket(sock);
+        exit(0);
+    } else {
+        printf("[错误] 未知命令: '%s'。输入 'help' 查看帮助。\n", command);
+    }
+}
+
+// 用户输入处理线程
+void* user_input_thread(void* arg) {
+    my_socket sock = *(my_socket*)arg;
+    char user_input_buffer[BUFFER_SIZE];
+
+    while (1) {
+        printf(">> ");
+        fflush(stdout);
+
+        if (fgets(user_input_buffer, sizeof(user_input_buffer), stdin) != NULL) {
+            process_user_command(user_input_buffer, sock);
+        } else {
+            break;
+        }
+    }
+    return NULL;
+}
+
+
 
 // TCP控制客户端，用于向服务器发送控制命令并接收响应。
 void tcp_control_client() {
     my_socket sock;
     struct sockaddr_in server_addr;
+
+    fd_set read_fds; // 用于select的读文件描述符集合
+    int max_fd;      // select需要监视的最大文件描述符
 
     printf("启动TCP控制客户端...\n");
 
@@ -43,111 +180,30 @@ void tcp_control_client() {
     printf("连接到TCP服务器 %s:%d 成功\n", SERVER_IP, TCP_PORT);
     printf("------------------------------------\n");
 
-    // 4. 主命令循环
+    printf("连接到TCP服务器 %s:%d 成功\n", SERVER_IP, TCP_PORT);
+    printf("输入 'help' 查看可用命令。\n");
+    printf("------------------------------------\n");
+
+    // 创建用户输入线程
+#ifdef _WIN32
+    HANDLE thread = CreateThread(NULL, 0,
+        (LPTHREAD_START_ROUTINE)user_input_thread, &sock, 0, NULL);
+#else
+    pthread_t thread;
+    pthread_create(&thread, NULL, user_input_thread, &sock);
+#endif
+
+    // 主线程只处理网络消息
     while (1) {
-        printf("\n请输入命令:\n");
-        printf("  1: 获取传感器数据\n");
-        printf("  2: 让服务器执行远程命令\n");
-        printf("  0: 退出\n");
-        printf(">> ");
+        if(handle_server_message(sock) < 0) break;
+    }
 
-        char input_buffer[16];
-        int choice = -1;
-
-        // 读取用户输入
-        if (fgets(input_buffer, sizeof(input_buffer), stdin) != NULL) {
-            // 解析整数输入
-            sscanf(input_buffer, "%d", &choice);
-        } else {
-            // 读取失败 (例如用户输入了文件结束符 Ctrl+D)
-            printf("输入流结束，正在退出...\n");
-            break;
-        }
-
-        if (choice == 0) {
-            printf("正在断开连接...\n");
-            break; // 跳出循环以关闭客户端
-        }
-
-        if (choice == 1) {
-            // 准备发送“获取数据”命令
-            control_cmd_t cmd;
-            cmd.cmd = 1; // 命令类型
-            strncpy(cmd.param, "get_data", sizeof(cmd.param) - 1);
-            cmd.param[sizeof(cmd.param) - 1] = '\0'; // 确保字符串以空字符结尾
-
-            // 发送命令
-            if (send_data(sock, &cmd, sizeof(cmd), 0) < 0) {
-                 perror("发送命令失败");
-                 break; // 发送失败，很可能连接已断开，退出循环
-            }
-
-            // 接收服务器返回的传感器数据
-            sensor_data_t sensor_data;
-            int bytes_received = recv_data(sock, &sensor_data, sizeof(sensor_data), 0);
-
-            if (bytes_received > 0) {
-                // 成功接收到数据
-                printf("\n--- 收到服务器响应 ---\n");
-                printf("  数据类型: %d\n", sensor_data.type);
-                printf("  数    值: %.2f\n", sensor_data.value);
-                printf("  时 间 戳: %s\n", sensor_data.timestamp);
-                printf("------------------------\n");
-            } else if (bytes_received == 0) {
-                // 服务器主动关闭了连接
-                printf("服务器已关闭连接。\n");
-                break;
-            } else {
-                // 接收数据时发生错误
-                perror("接收数据失败");
-                break;
-            }
-        } else if (choice == 2) {
-            // ----- 新增：执行远程命令 -----
-            control_cmd_t cmd;
-            cmd.cmd = 2; // 命令类型 2 代表执行远程命令
-
-            char command_input[256]; // 用于读取用户输入的缓冲区
-            printf("请输入要远程执行的命令 (最大 %zu 字符): ", sizeof(cmd.param) - 1);
-
-            // 读取一整行命令
-            if (fgets(command_input, sizeof(command_input), stdin) == NULL) {
-                printf("读取命令失败。\n");
-                continue; // 返回菜单
-            }
-
-            // 移除 fgets 读取到的末尾换行符
-            command_input[strcspn(command_input, "\n")] = 0;
-
-            // 将命令复制到结构体中
-            strncpy(cmd.param, command_input, sizeof(cmd.param) - 1);
-            cmd.param[sizeof(cmd.param) - 1] = '\0';
-
-            // 发送命令
-            if (send_data(sock, &cmd, sizeof(cmd), 0) < 0) {
-                perror("发送执行命令失败");
-                break;
-            }
-
-            // 准备接收服务器返回的执行结果
-            char response_buffer[BUFFER_SIZE];
-            int bytes_received = recv_data(sock, response_buffer, sizeof(response_buffer) - 1, 0);
-
-            if (bytes_received > 0) {
-                response_buffer[bytes_received] = '\0'; // 确保字符串正确结尾
-                printf("\n--- 服务器执行结果 ---\n%s\n--------------------------\n", response_buffer);
-            } else if (bytes_received == 0) {
-                printf("服务器已关闭连接。\n");
-                break;
-            } else {
-                perror("接收执行结果失败");
-                break;
-            }
-        }
-        else {
-            printf("无效的命令 '%d'，请重新输入。\n", choice);
-        }
-    } // 循环结束
+    // 清理线程
+#ifdef _WIN32
+    WaitForSingleObject(thread, INFINITE);
+#else
+    pthread_join(thread, NULL);
+#endif
 
     // 5. 关闭套接字
     close_socket(sock);
@@ -192,6 +248,9 @@ void udp_sensor_client() {
         strcpy(sensor_data.timestamp, timestamp);
 
         // 发送数据到服务器
+        device_data_t device_data = {
+
+        };
         send_data_with_addr(sock, &sensor_data, sizeof(sensor_data), 0,
             &server_addr, sizeof(server_addr));
 
