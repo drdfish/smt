@@ -39,7 +39,7 @@ typedef struct {
 } sensor_data_t;
 
 typedef struct {
-    int cmd;           // 命令类型
+    int cmd;           // 命令类型 0 - 断开，1 - 数据请求，2 - 控制命令，3 - 登录
     char param[32];    // 参数
 } control_cmd_t;
 
@@ -54,7 +54,6 @@ typedef struct {
 
 } device_data_t;
 
-// 消息类型枚举
 typedef enum {
     MSG_TYPE_UNKNOWN,
     MSG_TYPE_SENSOR_DATA_RESPONSE, // 对获取传感器数据请求的响应
