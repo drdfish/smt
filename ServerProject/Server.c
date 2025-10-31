@@ -128,7 +128,7 @@ int handle_tcp_connection(my_socket client_sock) {
                     return -1; // 关闭连接，返回 -1
                     break;
                 }
-                case 1: // 获取传感器列表
+                case CMD_LIST_DEVICE: // 获取传感器列表
                 {
                     printf("客户端请求传感器数据\n");
 
@@ -143,7 +143,7 @@ int handle_tcp_connection(my_socket client_sock) {
                     break;
                 }
 
-                case 2: // 控制设备
+                case CMD_LIST_DEVICE_DATA: // 设备数据
                 {
                     int dev_index = getIDIndex(cmd.param);
 
@@ -156,7 +156,7 @@ int handle_tcp_connection(my_socket client_sock) {
                     send_data(client_sock, &server_msg, sizeof(server_message_t), 0);
                     break;
                 }
-                case 3:
+                case CMD_EXEC_DEVICE:
                 {
                     server_msg.type = MSG_TYPE_COMMAND_RESULT;
                     snprintf(server_msg.data.command_result, sizeof(server_msg.data.command_result),
