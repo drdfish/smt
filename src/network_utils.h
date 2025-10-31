@@ -38,9 +38,20 @@ typedef struct {
 } sensor_data_t;
 
 typedef struct {
-    int cmd;           // 命令类型
+    int cmd;           // 命令类型 0 - 断开，1 - 数据请求，2 - 控制命令，3 - 登录
     char param[32];    // 参数
 } control_cmd_t;
+
+typedef struct {
+    char device_id[5];               // 唯一标识符
+
+    int type;                  // 数据类型标识：1 - sensor_data, 2 - control_cmd
+    union {
+        sensor_data_t sensor_data;   // 用于存储传感器数据
+        control_cmd_t control_cmd;   // 用于存储控制命令
+    } data;
+
+} device_data_t;
 
 void init_console();
 

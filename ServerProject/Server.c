@@ -7,10 +7,14 @@
 
 my_socket client_sockets[MAX_CLIENTS];
 sensor_data_t* client_sensor_data[MAX_CLIENTS];
+int data_counters[MAX_CLIENTS] ;
+char* client_ids[MAX_CLIENTS];
 
 void init_client_sockets() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         client_sockets[i] = -1; // -1 表示该位置没有连接
+        client_ids[i] = NULL;
+        data_counters[i] = 0;
     }
 }
 
@@ -23,10 +27,30 @@ int find_empty_slot() {
     return -1;  // 如果没有空位，返回 -1
 }
 
+int getSocketIndex(my_socket client_socket) {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (client_sockets[i] == client_socket) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int getIDIndex(char* device_id) {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (client_ids[i] == device_id) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void remove_client(int index) {
     if (index >= 0 && index < MAX_CLIENTS) {
         close_socket(client_sockets[index]);
         client_sockets[index] = -1;  // 清除套接字
+        client_ids[index] = NULL;
+        data_counters[index] = 0;
         printf("客户端套接字 %d 连接已断开\n", index);
     }
     //释放内存
@@ -34,82 +58,125 @@ void remove_client(int index) {
         free(client_sensor_data[index]);
         client_sensor_data[index] = NULL;
     }
+}
 
+void add_data(int index, sensor_data_t sensor_data) {
+    if (index >= 0 && index < MAX_CLIENTS) {
+        if (data_counters[index] < MAX_SENSOR_DATA) {
+            client_sensor_data[index][data_counters[index]] = sensor_data;
+            data_counters[index]++;
+        }else {
+            printf("数据已满");
+        }
+    }
 }
 
 // 处理 TCP 连接
 int handle_tcp_connection(my_socket client_sock) {
     char buffer[BUFFER_SIZE];
-    control_cmd_t cmd;
-
     int bytes_received = recv_data(client_sock, buffer, BUFFER_SIZE, 0);
-    if (bytes_received <= 0) return -1;
 
-    memcpy(&cmd, buffer, sizeof(cmd));
-
-    switch (cmd.cmd)
-    {
-    case 1: // 获取传感器数据
-    {
-        printf("客户端请求传感器数据\n");
-
-        // 模拟传感器数据
-        sensor_data_t sensor_data = { 1, 25.5, "2025-10-24 10:00:00" };
-
-        send_data(client_sock, &sensor_data, sizeof(sensor_data), 0);
-        printf("传感器数据已发送\n");
-        break;
+    if (bytes_received <= 0) {
+        return -1; // 如果接收失败或连接关闭，返回
     }
 
-    case 2: // 控制设备
-    {
-        printf("执行控制命令: %s\n", cmd.param);
+    device_data_t device_data;
+    memcpy(&device_data, buffer, sizeof(device_data_t));
+    char* client_id = device_data.device_id;
 
-        char response[] = "控制命令执行成功";
+    // 检查数据类型，只处理 type == 2，即控制命令
+    if (device_data.type == 2) {
+        control_cmd_t cmd = device_data.data.control_cmd;
+        if (client_id != NULL) {
+            switch (cmd.cmd) {
+                case 1: // 获取传感器数据
+                {
+                    printf("客户端请求传感器数据\n");
 
-        send_data(client_sock, response, strlen(response), 0);
-        break;
+                    // 模拟传感器数据
+                    sensor_data_t sensor_data = { 1, 25.5, "2025-10-24 10:00:00" };
+
+                    send_data(client_sock, &sensor_data, sizeof(sensor_data), 0);
+                    printf("传感器数据已发送\n");
+                    break;
+                }
+
+                case 2: // 控制设备
+                {
+                    printf("执行控制命令: %s\n", cmd.param);
+
+                    char response[] = "控制命令执行成功";
+                    send_data(client_sock, response, strlen(response), 0);
+                    break;
+                }
+                case 0: // 关闭连接
+                {
+                    printf("执行关闭: %s\n", cmd.param);
+
+                    char response[] = "连接断开";
+                    send_data(client_sock, response, strlen(response), 0);
+                    return -1; // 关闭连接，返回 -1
+                    break;
+                }
+                case 3:
+                {
+                    printf("执行登录: %s\n", cmd.param);
+                    int index = getSocketIndex(client_sock);
+                    if (index >= 0) {
+                        client_ids[index] = client_id;
+                        char response[] = "登录成功";
+                        send_data(client_sock, response, strlen(response), 0);
+                    }else {
+                        char response[] = "登录失败";
+                        send_data(client_sock, response, strlen(response), 0);
+                        return -1;
+                    }
+                    break;
+                }
+                default:
+                    printf("未知命令\n");
+                    break;
+            }
+        }
+    } else {
+        printf("收到非控制命令类型的数据，忽略\n");
     }
-    case 0: //关闭连接
-    {
-        printf("执行关闭: %s\n", cmd.param);
 
-        char response[] = "连接断开";
-
-        send_data(client_sock, response, strlen(response), 0);
-        return -1;
-    }
-    default:
-    {
-        printf("未知命令\n");
-        break;
-    }
-    }
-
-    return 0;
+    return 1;
 }
 
-// 处理 UDP 数据
 int handle_udp_data(my_socket udp_sock) {
     struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
 
+    // 接收数据
     int bytes_received = recvfrom(udp_sock, buffer, BUFFER_SIZE, 0,
         (struct sockaddr*)&client_addr, &addr_len);
 
-    if (bytes_received > 0) {
-        sensor_data_t sensor_data;
-        memcpy(&sensor_data, buffer, sizeof(sensor_data));
+    if (bytes_received <= 0) {
+        return -1; // 如果接收失败或连接关闭，返回
+    }
 
-        printf("收到传感器数据 - 类型:%d 数值:%.2f 时间:%s\n",
-            sensor_data.type, sensor_data.value, sensor_data.timestamp);
+    device_data_t device_data;
+    memcpy(&device_data, buffer, sizeof(device_data_t));
+    char* client_id = device_data.device_id;
+    int index = getIDIndex(client_id);
+
+    if (index < 0)
+        return -1; // 未知ID
+
+    if (device_data.type == 1) {  // 传感器数据
+        sensor_data_t sensor_data = device_data.data.sensor_data;
+        add_data(index, sensor_data);
+        printf("收到传感器数据 - 类型: %d, 数值: %.2f, 时间: %s\n",
+               sensor_data.type, sensor_data.value, sensor_data.timestamp);
 
         // 数据存储逻辑
         FILE* log_file = fopen("sensor_log.txt", "a");
         if (log_file) {
-            fprintf(log_file, "类型:%d, 数值:%.2f, 时间:%s\n",
-                sensor_data.type, sensor_data.value, sensor_data.timestamp);
+            fprintf(log_file, "类型: %d, 数值: %.2f, 时间: %s\n",
+                    sensor_data.type, sensor_data.value, sensor_data.timestamp);
             fclose(log_file);
         }
 
@@ -117,9 +184,10 @@ int handle_udp_data(my_socket udp_sock) {
         if (sensor_data.type == 1 && sensor_data.value > 30.0) {
             printf("警告: 温度过高! 当前温度: %.2f\n", sensor_data.value);
         }
+        return 1;
+    }else {
+        return -1;
     }
-
-    return 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -202,7 +270,6 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-
         int activity = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
 
         if (activity < 0) {
@@ -218,28 +285,27 @@ int main(int argc, char* argv[]) {
             my_socket client_sock = accept_connection(tcp_sock, (struct sockaddr*)&client_addr, &client_len);
             if (client_sock < 0) {
                 perror("接受连接失败");
-                continue;
-            }
-
-            // 查找空槽位并添加新客户端
-            int empty_slot = find_empty_slot();
-            if (empty_slot == -1) {
-                printf("客户端连接已满，拒绝连接\n");
-                close_socket(client_sock); // 拒绝连接
-            }
-            else {
-                client_sockets[empty_slot] = client_sock;
-                client_sensor_data[empty_slot] = (sensor_data_t*)malloc(sizeof(sensor_data_t) * MAX_SENSOR_DATA);  // 假设最多有 MAX_SENSOR_DATA 个传感器数据
-                if (client_sensor_data[empty_slot] == NULL) {
-                    perror("内存分配失败");
-                    close_socket(client_sock);
-                    client_sockets[empty_slot] = -1;
+            }else {
+                // 查找空槽位并添加新客户端
+                int empty_slot = find_empty_slot();
+                if (empty_slot == -1) {
+                    printf("客户端连接已满，拒绝连接\n");
+                    close_socket(client_sock); // 拒绝连接
                 }
                 else {
-                    printf("新的TCP客户端连接: %s:%d\n",
-                            inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-                }
+                    client_sockets[empty_slot] = client_sock;
+                    client_sensor_data[empty_slot] = (sensor_data_t*)malloc(sizeof(sensor_data_t) * MAX_SENSOR_DATA);  // 假设最多有 MAX_SENSOR_DATA 个传感器数据
+                    if (client_sensor_data[empty_slot] == NULL) {
+                        perror("内存分配失败");
+                        close_socket(client_sock);
+                        client_sockets[empty_slot] = -1;
+                    }
+                    else {
+                        printf("新的TCP客户端连接: %s:%d\n",
+                                inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+                    }
 
+                }
             }
         }
 
