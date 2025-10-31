@@ -301,7 +301,7 @@ void udp_sensor_client() {
         // 发送数据到服务器
         device_data_t device_data = {
             .device_id = DEVICE_ID,  // 假设 DEVICE_ID 是字符串，如 "DEV1"
-            .type = 2,               // 2 表示 control_cmd
+            .type = 1,
             .data.sensor_data = sensor_data  // 初始化 control_cmd
         };
         send_data_with_addr(sock, &device_data, sizeof(device_data), 0,
@@ -333,8 +333,8 @@ int main(int argc, char* argv[]) {
     if (argc > 1 && strcmp(argv[1], "control") == 0) {
         tcp_control_client();
     } else {
-        tcp_control_client();
-        // udp_sensor_client();
+        //tcp_control_client();
+        udp_sensor_client();
     }
 
     // 清理网络库 (在Windows上此操作是必需的)
