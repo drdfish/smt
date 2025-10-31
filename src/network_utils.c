@@ -1,11 +1,18 @@
 #include "network_utils.h"
 
 
+
+void init_console() {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
+}
+
 void platform_sleep(int seconds) {
 #ifdef _WIN32
-    Sleep(seconds * 1000);  // Windows SleepÊÇÒÔºÁÃëÎªµ¥Î»
+    Sleep(seconds * 1000);  // Windows Sleepæ˜¯ä»¥æ¯«ç§’ä¸ºå•ä½
 #else
-    sleep(seconds);  // Linux ÏÂÊ¹ÓÃ sleep
+    sleep(seconds);  // Linux ä¸‹ä½¿ç”¨ sleep
 #endif
 }
 
@@ -59,12 +66,12 @@ int accept_connection(my_socket sockfd, struct sockaddr* addr, int* addrlen) {
     return accept(sockfd, addr, addrlen);
 }
 
-// WindowsÏÂµÄrecvº¯Êı
+// Windowsä¸‹çš„recvå‡½æ•°
 int recv_data(my_socket sockfd, void* buf, size_t len, int flags) {
     return recv(sockfd, ( char*)buf, (int)len, flags);
 }
 
-// WindowsÏÂµÄsendº¯Êı
+// Windowsä¸‹çš„sendå‡½æ•°
 int send_data(my_socket sockfd, const void* buf, size_t len, int flags) {
     return send(sockfd, (const char*)buf, (int)len, flags);
 }
@@ -72,9 +79,9 @@ int send_data(my_socket sockfd, const void* buf, size_t len, int flags) {
 int send_data_with_addr(my_socket sockfd, const void* buf, size_t len, int flags, struct sockaddr_in* addr, socklen_t addr_len) {
     return sendto(sockfd, (const char*)buf, (int)len, flags, (struct sockaddr*)addr, addr_len);
 }
-#else 
+#else
 
-// LinuxÆ½Ì¨µÄº¯ÊıÊµÏÖ
+// Linuxå¹³å°çš„å‡½æ•°å®ç°
 int network_init() {
     return 1;
 }

@@ -8,9 +8,9 @@
 #include <string.h>
 #include <time.h>
 #ifdef _WIN32
-#include <winsock2.h>  // Windows Ì×½Ó×Ö±à³Ì
+#include <winsock2.h>  // Windows å¥—æ¥å­—ç¼–ç¨‹
 #include <windows.h>
-#include <ws2tcpip.h> 
+#include <ws2tcpip.h>
 #else
 #include <unistd.h>
 #include <sys/socket.h>
@@ -21,7 +21,7 @@
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 10
 
-// ¶¨Òå¿çÆ½Ì¨µÄÌ×½Ó×Ö¹Ø±Õº¯Êı
+// å®šä¹‰è·¨å¹³å°çš„å¥—æ¥å­—å…³é—­å‡½æ•°
 #ifdef _WIN32
 #define close_socket closesocket
 #define my_socket SOCKET
@@ -30,26 +30,25 @@
 #define my_socket int
 #endif
 
-// ¶¨Òå´«¸ĞÆ÷Êı¾İºÍ¿ØÖÆÃüÁîµÄ½á¹¹Ìå
+// å®šä¹‰ä¼ æ„Ÿå™¨æ•°æ®å’Œæ§åˆ¶å‘½ä»¤çš„ç»“æ„ä½“
 typedef struct {
-    int type;           // ÀàĞÍ£º1 - ÎÂ¶È£¬2 - Êª¶È£¬3 - ¹âÕÕµÈ
-    float value;        // Êı¾İÖµ
-    char timestamp[20]; // Ê±¼ä´Á
+    int type;           // ç±»å‹ï¼š1 - æ¸©åº¦ï¼Œ2 - æ¹¿åº¦ï¼Œ3 - å…‰ç…§ç­‰
+    float value;        // æ•°æ®å€¼
+    char timestamp[20]; // æ—¶é—´æˆ³
 } sensor_data_t;
 
 typedef struct {
-    int cmd;           // ÃüÁîÀàĞÍ
-    char param[32];    // ²ÎÊı
+    int cmd;           // å‘½ä»¤ç±»å‹
+    char param[32];    // å‚æ•°
 } control_cmd_t;
 
+void init_console();
+
 void get_current_time(char* buffer);
-// ¿çÆ½Ì¨µÄË¯Ãßº¯Êı£¬µ¥Î»ÎªÃë
+// è·¨å¹³å°çš„ç¡çœ å‡½æ•°ï¼Œå•ä½ä¸ºç§’
 void platform_sleep(int seconds);
 
-// Í¨ÓÃµÄ IP µØÖ·×ª»»º¯Êı
-int my_inet_pton(int af, const char* src, void* dst);
-
-// Ì×½Ó×Ö²Ù×÷º¯ÊıÉùÃ÷
+// å¥—æ¥å­—æ“ä½œå‡½æ•°å£°æ˜
 int network_init();
 void network_cleanup();
 my_socket create_tcp_socket();

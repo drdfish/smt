@@ -1,9 +1,9 @@
-#include "network_utils.h" // ÒıÈëÍ·ÎÄ¼ş
+#include "network_utils.h" // å¼•å…¥å¤´æ–‡ä»¶
 
 #define TCP_PORT 8080
 #define UDP_PORT 8081
 
-// ´¦Àí TCP Á¬½Ó
+// å¤„ç† TCP è¿æ¥
 int handle_tcp_connection(my_socket client_sock) {
     char buffer[BUFFER_SIZE];
     control_cmd_t cmd;
@@ -15,22 +15,23 @@ int handle_tcp_connection(my_socket client_sock) {
 
     switch (cmd.cmd)
     {
-    case 1: // »ñÈ¡´«¸ĞÆ÷Êı¾İ
+    case 1: // è·å–ä¼ æ„Ÿå™¨æ•°æ®
     {
-        printf("¿Í»§¶ËÇëÇó´«¸ĞÆ÷Êı¾İ\n");
+        printf("å®¢æˆ·ç«¯è¯·æ±‚ä¼ æ„Ÿå™¨æ•°æ®\n");
 
-        // Ä£Äâ´«¸ĞÆ÷Êı¾İ
+        // æ¨¡æ‹Ÿä¼ æ„Ÿå™¨æ•°æ®
         sensor_data_t sensor_data = { 1, 25.5, "2025-10-24 10:00:00" };
 
         send_data(client_sock, &sensor_data, sizeof(sensor_data), 0);
+        printf("ä¼ æ„Ÿå™¨æ•°æ®å·²å‘é€\n");
         break;
     }
 
-    case 2: // ¿ØÖÆÉè±¸
+    case 2: // æ§åˆ¶è®¾å¤‡
     {
-        printf("Ö´ĞĞ¿ØÖÆÃüÁî: %s\n", cmd.param);
+        printf("æ‰§è¡Œæ§åˆ¶å‘½ä»¤: %s\n", cmd.param);
 
-        char response[] = "¿ØÖÆÃüÁîÖ´ĞĞ³É¹¦";
+        char response[] = "æ§åˆ¶å‘½ä»¤æ‰§è¡ŒæˆåŠŸ";
 
         send_data(client_sock, response, strlen(response), 0);
         break;
@@ -38,7 +39,7 @@ int handle_tcp_connection(my_socket client_sock) {
 
     default:
     {
-        printf("Î´ÖªÃüÁî\n");
+        printf("æœªçŸ¥å‘½ä»¤\n");
         break;
     }
     }
@@ -46,7 +47,7 @@ int handle_tcp_connection(my_socket client_sock) {
     return 0;
 }
 
-// ´¦Àí UDP Êı¾İ
+// å¤„ç† UDP æ•°æ®
 int handle_udp_data(my_socket udp_sock) {
     struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
@@ -59,20 +60,20 @@ int handle_udp_data(my_socket udp_sock) {
         sensor_data_t sensor_data;
         memcpy(&sensor_data, buffer, sizeof(sensor_data));
 
-        printf("ÊÕµ½´«¸ĞÆ÷Êı¾İ - ÀàĞÍ:%d ÊıÖµ:%.2f Ê±¼ä:%s\n",
+        printf("æ”¶åˆ°ä¼ æ„Ÿå™¨æ•°æ® - ç±»å‹:%d æ•°å€¼:%.2f æ—¶é—´:%s\n",
             sensor_data.type, sensor_data.value, sensor_data.timestamp);
 
-        // Êı¾İ´æ´¢Âß¼­
+        // æ•°æ®å­˜å‚¨é€»è¾‘
         FILE* log_file = fopen("sensor_log.txt", "a");
         if (log_file) {
-            fprintf(log_file, "ÀàĞÍ:%d, ÊıÖµ:%.2f, Ê±¼ä:%s\n",
+            fprintf(log_file, "ç±»å‹:%d, æ•°å€¼:%.2f, æ—¶é—´:%s\n",
                 sensor_data.type, sensor_data.value, sensor_data.timestamp);
             fclose(log_file);
         }
 
-        // ±¨¾¯¼ì²é
+        // æŠ¥è­¦æ£€æŸ¥
         if (sensor_data.type == 1 && sensor_data.value > 30.0) {
-            printf("¾¯¸æ: ÎÂ¶È¹ı¸ß! µ±Ç°ÎÂ¶È: %.2f\n", sensor_data.value);
+            printf("è­¦å‘Š: æ¸©åº¦è¿‡é«˜! å½“å‰æ¸©åº¦: %.2f\n", sensor_data.value);
         }
     }
 
@@ -85,37 +86,38 @@ int main() {
     fd_set read_fds;
     int max_fd;
 
-    printf("Æô¶¯ÖÇÄÜ¼Ò¾Ó»·¾³¼à¿Ø·şÎñÆ÷...\n");
+    init_console();
+    printf("å¯åŠ¨æ™ºèƒ½å®¶å…·æœåŠ¡å™¨...\n");
     if(network_init()<0)
         return -1;
-    // ´´½¨ TCP ºÍ UDP Ì×½Ó×Ö
+    // åˆ›å»º TCP å’Œ UDP å¥—æ¥å­—
     tcp_sock = create_tcp_socket();
     udp_sock = create_udp_socket();
 
-    // ÉèÖÃ TCP µØÖ·
+    // è®¾ç½® TCP åœ°å€
     memset(&tcp_addr, 0, sizeof(tcp_addr));
     tcp_addr.sin_family = AF_INET;
     tcp_addr.sin_addr.s_addr = INADDR_ANY;
     tcp_addr.sin_port = htons(TCP_PORT);
 
-    // °ó¶¨ TCP Ì×½Ó×Ö
+    // ç»‘å®š TCP å¥—æ¥å­—
     bind_socket(tcp_sock, (struct sockaddr*)&tcp_addr, sizeof(tcp_addr));
 
-    // ¼àÌı TCP Á¬½Ó
+    // ç›‘å¬ TCP è¿æ¥
     listen_socket(tcp_sock, MAX_CLIENTS);
 
-    // ÉèÖÃ UDP µØÖ·
+    // è®¾ç½® UDP åœ°å€
     memset(&udp_addr, 0, sizeof(udp_addr));
     udp_addr.sin_family = AF_INET;
     udp_addr.sin_addr.s_addr = INADDR_ANY;
     udp_addr.sin_port = htons(UDP_PORT);
 
-    // °ó¶¨ UDP Ì×½Ó×Ö
+    // ç»‘å®š UDP å¥—æ¥å­—
     bind_socket(udp_sock, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
 
-    printf("·şÎñÆ÷Æô¶¯³É¹¦!\n");
-    printf("TCP·şÎñ¶Ë¿Ú: %d\n", TCP_PORT);
-    printf("UDP·şÎñ¶Ë¿Ú: %d\n", UDP_PORT);
+    printf("æœåŠ¡å™¨å¯åŠ¨æˆåŠŸ!\n");
+    printf("TCPæœåŠ¡ç«¯å£: %d\n", TCP_PORT);
+    printf("UDPæœåŠ¡ç«¯å£: %d\n", UDP_PORT);
 
     max_fd = (tcp_sock > udp_sock) ? tcp_sock : udp_sock;
 
@@ -127,29 +129,29 @@ int main() {
         int activity = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
 
         if (activity < 0) {
-            perror("select´íÎó");
+            perror("selecté”™è¯¯");
             continue;
         }
 
-        // ´¦Àí TCP Á¬½ÓÇëÇó
+        // å¤„ç† TCP è¿æ¥è¯·æ±‚
         if (FD_ISSET(tcp_sock, &read_fds)) {
             struct sockaddr_in client_addr;
             socklen_t client_len = sizeof(client_addr);
 
             int client_sock = accept_connection(tcp_sock, (struct sockaddr*)&client_addr, &client_len);
             if (client_sock < 0) {
-                perror("½ÓÊÜÁ¬½ÓÊ§°Ü");
+                perror("æ¥å—è¿æ¥å¤±è´¥");
                 continue;
             }
 
-            printf("ĞÂµÄTCP¿Í»§¶ËÁ¬½Ó: %s:%d\n",
+            printf("æ–°çš„TCPå®¢æˆ·ç«¯è¿æ¥: %s:%d\n",
                 inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
             handle_tcp_connection(client_sock);
             close_socket(client_sock);
         }
 
-        // ´¦Àí UDP Êı¾İ
+        // å¤„ç† UDP æ•°æ®
         if (FD_ISSET(udp_sock, &read_fds)) {
             handle_udp_data(udp_sock);
         }
