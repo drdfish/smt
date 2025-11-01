@@ -97,10 +97,10 @@ void network_cleanup() {
 
 my_socket create_tcp_socket(int* success) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    success = 1;
+    *success = 1;
     if (sock < 0) {
         perror("socket failed");
-        success = -1;
+        *success = -1;
     }
 
     return sock;
@@ -108,15 +108,17 @@ my_socket create_tcp_socket(int* success) {
 
 my_socket create_udp_socket(int* success) {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    success = 1;
+    *success = 1;
     if (sock < 0) {
         perror("socket failed");
-        success = -1;
+        *success = -1;
     }
     return sock;
 }
 
-int bind_socket(my_socket sockfd, const struct sockaddr* addr, socklen_t addrlen) {
+// <--- 修改：将addrlen的类型从 socklen_t 改为 int，以匹配头文件声明
+int bind_socket(my_socket sockfd, const struct sockaddr* addr, int addrlen) {
+    // 注意：这里将int隐式转换为socklen_t，在大多数平台上是安全的
     return bind(sockfd, addr, addrlen);
 }
 
@@ -124,8 +126,10 @@ int listen_socket(my_socket sockfd, int backlog) {
     return listen(sockfd, backlog);
 }
 
-int accept_connection(my_socket sockfd, struct sockaddr* addr, socklen_t * addrlen) {
-    return accept(sockfd, addr, addrlen);
+// <--- 修改：将addrlen的类型从 socklen_t* 改为 int*，以匹配头文件声明
+int accept_connection(my_socket sockfd, struct sockaddr* addr, int* addrlen) {
+    // 注意：调用真实的accept函数时，需要将 int* 强制转换为 socklen_t*
+    return accept(sockfd, addr, (socklen_t*)addrlen);
 }
 
 int recv_data(my_socket sockfd, void* buf, size_t len, int flags) {

@@ -333,7 +333,7 @@ int main(int argc, char* argv[]) {
     if (argc > 1 && strcmp(argv[1], "control") == 0) {
         tcp_control_client();
     } else {
-        //tcp_control_client();
+        // tcp_control_client();
         udp_sensor_client();
     }
 
